@@ -209,6 +209,8 @@ set(COMMON_SRC
     dsda/skip.h
     dsda/sndinfo.c
     dsda/sndinfo.h
+    dsda/spatial_sound.c
+    dsda/spatial_sound.h
     dsda/spawn_number.c
     dsda/spawn_number.h
     dsda/split_tracker.c
