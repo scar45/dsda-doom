@@ -28,6 +28,11 @@ if(WITH_XMP)
     list(APPEND VCPKG_MANIFEST_FEATURES "libxmp")
 endif()
 
+option(WITH_OPENAL "Use OpenAL Soft for HRTF sound effects if available" ON)
+if(WITH_OPENAL)
+    list(APPEND VCPKG_MANIFEST_FEATURES "openal-soft")
+endif()
+
 if(CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg.cmake$")
   option(VCPKG_APPLOCAL_DEPS "Copy dependencies in the output directory" ON)
   option(X_VCPKG_APPLOCAL_DEPS_INSTALL "Copy dependencies during installation" ON)

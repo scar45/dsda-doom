@@ -58,6 +58,12 @@
         }
       ]
     },
+    "openal-soft": {
+      "description": "Build with OpenAL Soft (HRTF sound effects) support",
+      "dependencies": [
+        "openal-soft"
+      ]
+    },
     "portmidi": {
       "description": "Build with PortMidi support",
       "dependencies": [

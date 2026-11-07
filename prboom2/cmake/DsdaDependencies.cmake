@@ -77,6 +77,22 @@ if(WITH_PORTMIDI)
   endif()
 endif()
 
+if(WITH_OPENAL)
+  find_package(OpenAL ${dsda_strict_keyword})
+  if(OpenAL_FOUND OR OPENAL_FOUND)
+    set(HAVE_LIBOPENAL TRUE)
+    # CMake's FindOpenAL only creates OpenAL::OpenAL from 3.25; OpenAL Soft's
+    # own package config always does. Cover the old-module case.
+    if(NOT TARGET OpenAL::OpenAL)
+      add_library(OpenAL::OpenAL UNKNOWN IMPORTED)
+      set_target_properties(
+        OpenAL::OpenAL
+        PROPERTIES IMPORTED_LOCATION "${OPENAL_LIBRARY}"
+                   INTERFACE_INCLUDE_DIRECTORIES "${OPENAL_INCLUDE_DIR}")
+    endif()
+  endif()
+endif()
+
 # Before SDL 2.24.x, all SDL2::* targets were created in autotools builds, even if the underlying library wasn't built.
 # So wrap all this in our interface library
 add_library(dsda_SDL2 INTERFACE IMPORTED)
@@ -132,6 +148,7 @@ target_link_libraries(dsda_dependencies
   $<$<BOOL:${HAVE_LIBFLUIDSYNTH}>:FluidSynth::libfluidsynth>
   $<$<BOOL:${HAVE_LIBVORBISFILE}>:Vorbis::vorbisfile>
   $<$<BOOL:${HAVE_LIBPORTMIDI}>:PortMidi::portmidi>
+  $<$<BOOL:${HAVE_LIBOPENAL}>:OpenAL::OpenAL>
 
   $<$<BOOL:${HAVE_LIBSDL2_IMAGE}>:$<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>>
   $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
