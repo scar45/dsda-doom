@@ -3552,6 +3552,7 @@ setup_menu_t gen_audio_settings[] = {
   EMPTY_LINE,
   { "Preferred MIDI player", S_CHOICE | S_STR, m_conf, G_X, dsda_config_snd_midiplayer, 0, midiplayers },
   { "Audio Output Device", S_CHOICE | S_STR, m_conf, G_X, dsda_config_snd_device, 0, audio_devices_list },
+  { "HRTF 3D Sound (Headphones)", S_YESNO, m_conf, G_X, dsda_config_snd_hrtf },
 
   PREV_PAGE(gen_video_settings),
   NEXT_PAGE(gen_mouse_settings),

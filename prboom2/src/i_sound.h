@@ -139,5 +139,6 @@ extern const char *audio_devices_list[];
 void M_ChangeMIDIPlayer(void);
 
 void I_ChangeAudioDevice(void);
+void I_ChangeSfxBackend(void);
 
 #endif

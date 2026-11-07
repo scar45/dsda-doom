@@ -58,6 +58,7 @@
 #include "m_swap.h"
 #include "i_sound.h"
 #include "i_sndfile.h"
+#include "i_oalsound.h"
 #include "m_misc.h"
 #include "w_wad.h"
 #include "lprintf.h"
@@ -441,6 +442,15 @@ static int getSliceSize(void)
   return 1024;
 }
 
+// Playback-rate multiplier for the OpenAL path; same table as the stock mixer.
+static float I_PitchFactor(int pitch)
+{
+  if (!pitched_sounds)
+    return 1.0f;
+
+  return (float) steptable[pitch] / 65536.0f;
+}
+
 static void updateSoundParams(int handle, sfx_params_t *params)
 {
   int slot = handle;
@@ -496,6 +506,12 @@ static void updateSoundParams(int handle, sfx_params_t *params)
 
 void I_UpdateSoundParams(int handle, sfx_params_t *params)
 {
+  if (I_OAL_Active())
+  {
+    I_OAL_UpdateSoundParams(handle, params, I_PitchFactor(params->pitch));
+    return;
+  }
+
   SDL_LockMutex (sfxmutex);
   updateSoundParams(handle, params);
   SDL_UnlockMutex (sfxmutex);
@@ -637,6 +653,19 @@ int I_StartSound(int id, int channel, sfx_params_t *params)
     }
   }
 
+  if (I_OAL_Active())
+  {
+    i_oal_sample_t sample;
+
+    sample.sfxid = id;
+    sample.data = cinfo.data;
+    sample.length = (int) (cinfo.enddata - cinfo.data) + 1;
+    sample.samplerate = cinfo.samplerate;
+    sample.bits = cinfo.bits;
+
+    return I_OAL_StartSound(channel, &sample, params, I_PitchFactor(params->pitch));
+  }
+
   SDL_LockMutex (sfxmutex);
 
   // Returns a handle (not used).
@@ -658,6 +687,12 @@ void I_StopSound (int handle)
     I_Error("I_StopSound: handle out of range");
 #endif
 
+  if (I_OAL_Active())
+  {
+    I_OAL_StopSound(handle);
+    return;
+  }
+
   SDL_LockMutex (sfxmutex);
   stopchan(handle);
   SDL_UnlockMutex (sfxmutex);
@@ -671,6 +706,9 @@ dboolean I_SoundIsPlaying(int handle)
     I_Error("I_SoundIsPlaying: handle out of range");
 #endif
 
+  if (I_OAL_Active())
+    return I_OAL_SoundIsPlaying(handle);
+
   return channelinfo[handle].data != NULL;
 }
 
@@ -682,6 +720,8 @@ dboolean I_AnySoundStillPlaying(void)
 
   for (i = 0; i < MAX_CHANNELS; i++)
     result |= channelinfo[i].data != NULL;
+
+  result |= I_OAL_AnySoundStillPlaying();
 
   return result;
 }
@@ -957,10 +997,32 @@ void I_ChangeAudioDevice(void)
   lprintf(LO_INFO, "switched audio output to \"%s\"\n", current_audio_device);
 }
 
+// snd_hrtf callback: swap sfx backends at runtime. Playing sfx are cut; the
+// s_sound channels notice on the next tic (I_SoundIsPlaying false) and free.
+void I_ChangeSfxBackend(void)
+{
+  int i;
+
+  if (!sound_was_initialized || dumping_sound || nosfxparm)
+    return;
+
+  SDL_LockMutex(sfxmutex);
+  for (i = 0; i < MAX_CHANNELS; ++i)
+    stopchan(i);
+  SDL_UnlockMutex(sfxmutex);
+
+  if (dsda_IntConfig(dsda_config_snd_hrtf))
+    I_OAL_Init();
+  else
+    I_OAL_Shutdown();
+}
+
 void I_ShutdownSound(void)
 {
   if (sound_was_initialized)
   {
+    I_OAL_Shutdown();
+
     Mix_CloseAudio();
     SDL_CloseAudio();
 
@@ -1043,6 +1105,9 @@ void I_InitSound(void)
   I_AtExit(I_ShutdownSound, true, "I_ShutdownSound", exit_priority_normal);
 
   sfxmutex = SDL_CreateMutex ();
+
+  if (!nosfxparm && !dumping_sound && dsda_IntConfig(dsda_config_snd_hrtf))
+    I_OAL_Init();
 
   if (!nomusicparm)
     I_InitMusic();
