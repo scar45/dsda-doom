@@ -453,6 +453,8 @@ set(MUS2MID_SRC
 
 set(SDLDOOM_SOURCES
     SDL/i_main.c
+    SDL/i_oalsound.c
+    SDL/i_oalsound.h
     SDL/i_sound.c
     SDL/i_sndfile.c
     SDL/i_sndfile.h
