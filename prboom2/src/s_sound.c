@@ -49,6 +49,7 @@
 #include "w_wad.h"
 #include "lprintf.h"
 #include "p_maputl.h"
+#include "p_mobj.h"
 #include "p_setup.h"
 #include "e6y.h"
 
@@ -347,6 +348,7 @@ void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume, dboolean impor
     params.sfx_class = sfx_class_none;
 
   params.ambient = false;
+  params.spatial = false;
   params.attenuation = adjust_attenuation;
   params.volume_factor = adjust_volume;
   params.loop = loop_timeout > 0;
@@ -821,6 +823,35 @@ void S_StopChannel(int cnum)
   }
 }
 
+// Listener-relative position for the HRTF backend. Read-only on game state.
+static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *params)
+{
+  fixed_t listener_z;
+
+  if (raven)
+  {
+    params->spatial = false;
+    return;
+  }
+
+  params->spatial = true;
+  params->azimuth =
+    R_PointToAngle2(listener->x, listener->y, source->x, source->y) - listener->angle;
+  params->dist = P_AproxDistance(listener->x - source->x, listener->y - source->y);
+
+  if (players[displayplayer].mo && listener == players[displayplayer].mo)
+    listener_z = players[displayplayer].viewz;
+  else
+    listener_z = listener->z;
+
+  // Sector/line sound origins are degenmobj_t: only x/y are meaningful (z is
+  // never set) and they have no height field, so treat them as level.
+  if (source->thinker.function == P_MobjThinker)
+    params->dz = source->z + (source->height >> 1) - listener_z;
+  else
+    params->dz = 0;
+}
+
 //
 // Changes volume, stereo-separation, and pitch variables
 //  from the norm of a sound effect to be played.
@@ -875,6 +906,8 @@ int S_AdjustSoundParams(mobj_t *listener, mobj_t *source, channel_t *channel, sf
 
   // stereo separation
   params->separation = 128 - (FixedMul(S_STEREO_SWING, finesine[angle]) >> FRACBITS);
+
+  S_SetSpatialParams(listener, source, params);
 
   // volume calculation
   if (raven)
@@ -1193,6 +1226,7 @@ static void Raven_S_StartSoundAtVolume(void *_origin, int sound_id, int volume, 
   params.volume_factor = 0;
   params.loop = loop_timeout > 0;
   params.loop_timeout = loop_timeout;
+  params.spatial = false;
 
   // calculate the distance before other stuff so that we can throw out
   // sounds that are beyond the hearing range.
@@ -1298,6 +1332,7 @@ void S_StartAmbientSound(void *_origin, int sound_id, int volume)
   params.volume_factor = 0;
   params.loop = false;
   params.loop_timeout = 0;
+  params.spatial = false;
 
   // no priority checking, as ambient sounds would be the LOWEST.
   for (i = 0; i < numChannels; i++)

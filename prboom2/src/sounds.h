@@ -36,6 +36,7 @@
 #define __SOUNDS__
 
 #include "doomtype.h"
+#include "tables.h"
 
 typedef enum {
   sfx_class_none,
@@ -54,6 +55,10 @@ typedef struct {
   dboolean loop;
   int loop_timeout;
   sfx_class_t sfx_class;
+  dboolean spatial;
+  angle_t azimuth;
+  fixed_t dist;
+  fixed_t dz;
 } sfx_params_t;
 
 //
