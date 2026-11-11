@@ -228,7 +228,8 @@ static void I_OAL_ApplyParams(int channel, const sfx_params_t *params, float pit
     gain = 1.0f;
 
   if (params->spatial)
-    dsda_SpatialSoundVector(params->azimuth, params->dist, params->dz, pos);
+    dsda_SpatialSoundVector(params->azimuth, params->dist, params->dz,
+                            params->listener_pitch, pos);
 
   alSourcef(source, AL_GAIN, gain);
   alSourcef(source, AL_PITCH, pitch);

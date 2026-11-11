@@ -59,6 +59,7 @@ typedef struct {
   angle_t azimuth;
   fixed_t dist;
   fixed_t dz;
+  angle_t listener_pitch; // freelook pitch, positive = looking down
 } sfx_params_t;
 
 //

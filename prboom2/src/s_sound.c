@@ -55,6 +55,7 @@
 
 #include "hexen/sn_sonix.h"
 
+#include "dsda/aim.h"
 #include "dsda/configuration.h"
 #include "dsda/map_format.h"
 #include "dsda/mapinfo.h"
@@ -840,9 +841,15 @@ static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *p
   params->dist = P_AproxDistance(listener->x - source->x, listener->y - source->y);
 
   if (players[displayplayer].mo && listener == players[displayplayer].mo)
+  {
     listener_z = players[displayplayer].viewz;
+    params->listener_pitch = dsda_PlayerPitch(&players[displayplayer]);
+  }
   else
+  {
     listener_z = listener->z;
+    params->listener_pitch = 0;
+  }
 
   // Sector/line sound origins are degenmobj_t: only x/y are meaningful (z is
   // never set) and they have no height field, so treat them as level.

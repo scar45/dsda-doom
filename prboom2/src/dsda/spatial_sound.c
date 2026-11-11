@@ -22,9 +22,11 @@
 #define SPATIAL_PI 3.14159265358979323846
 #define SPATIAL_ANGLE_TO_RAD (2.0 * SPATIAL_PI / 4294967296.0)
 
-void dsda_SpatialSoundVector(angle_t azimuth, fixed_t dist, fixed_t dz, float out[3])
+void dsda_SpatialSoundVector(angle_t azimuth, fixed_t dist, fixed_t dz,
+                             angle_t view_pitch, float out[3])
 {
-  double yaw, pitch, horizontal;
+  double yaw, elevation, horizontal, look_up;
+  double right, up, ahead;
 
   if (dist < 0)
     dist = 0;
@@ -36,10 +38,17 @@ void dsda_SpatialSoundVector(angle_t azimuth, fixed_t dist, fixed_t dz, float ou
   }
 
   yaw = (double) azimuth * SPATIAL_ANGLE_TO_RAD;
-  pitch = atan2((double) dz, (double) dist);
-  horizontal = cos(pitch);
+  elevation = atan2((double) dz, (double) dist);
+  horizontal = cos(elevation);
 
-  out[0] = (float) (-sin(yaw) * horizontal);
-  out[1] = (float) sin(pitch);
-  out[2] = (float) (-cos(yaw) * horizontal);
+  right = -sin(yaw) * horizontal;
+  up = sin(elevation);
+  ahead = cos(yaw) * horizontal;
+
+  // Tilt the head with freelook (rotate about the ear-to-ear axis).
+  look_up = -(double) (int) view_pitch * SPATIAL_ANGLE_TO_RAD;
+
+  out[0] = (float) right;
+  out[1] = (float) (up * cos(look_up) - ahead * sin(look_up));
+  out[2] = (float) -(ahead * cos(look_up) + up * sin(look_up));
 }

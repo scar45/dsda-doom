@@ -22,10 +22,13 @@
 
 // Converts a listener-relative Doom position into a unit direction vector in
 // OpenAL listener space (+x right, +y up, -z ahead).
-//   azimuth: source angle minus listener facing (0 ahead, ANG90 left, ANG180 behind)
-//   dist:    horizontal listener->source distance, fixed point
-//   dz:      source height minus listener eye height, fixed point
+//   azimuth:    source angle minus listener facing (0 ahead, ANG90 left, ANG180 behind)
+//   dist:       horizontal listener->source distance, fixed point
+//   dz:         source height minus listener eye height, fixed point
+//   view_pitch: listener freelook pitch (positive = looking down); tilts the
+//               head so a source you look straight at ends up dead ahead
 // Writes (0, 0, 0) when the source is on the listener (no direction).
-void dsda_SpatialSoundVector(angle_t azimuth, fixed_t dist, fixed_t dz, float out[3]);
+void dsda_SpatialSoundVector(angle_t azimuth, fixed_t dist, fixed_t dz,
+                             angle_t view_pitch, float out[3]);
 
 #endif
