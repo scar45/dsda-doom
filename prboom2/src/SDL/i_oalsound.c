@@ -29,10 +29,12 @@
 #include "al.h"
 #include "alc.h"
 #include "alext.h"
+#include "efx.h"
 
 #include "s_sound.h"
 #include "z_zone.h"
 
+#include "dsda/sound_occlusion.h"
 #include "dsda/spatial_sound.h"
 
 // Stock mixer: full-scale sample at vol 127 lands at 127/191 per side, and a
@@ -45,6 +47,34 @@ static ALuint oal_sources[MAX_CHANNELS];
 static ALuint *oal_buffers; // indexed by sfx id, 0 = not uploaded yet
 static int oal_buffer_count;
 static dboolean oal_active;
+
+// Occlusion: a low-pass per source, faded toward fully muffled (1) or clear
+// (0) by OCCL_STEP per tic. Tune by ear on hrtftest WALLS.
+#define OCCL_GAIN   0.7f
+#define OCCL_GAINHF 0.15f
+#define OCCL_STEP   0.25f
+
+static dboolean oal_efx;
+static ALuint oal_filters[MAX_CHANNELS];
+static float oal_occl[MAX_CHANNELS];
+static LPALGENFILTERS p_alGenFilters;
+static LPALDELETEFILTERS p_alDeleteFilters;
+static LPALFILTERI p_alFilteri;
+static LPALFILTERF p_alFilterf;
+
+// Occlusion: a low-pass per source, faded toward fully muffled (1) or clear
+// (0) by OCCL_STEP per tic. Tune by ear on hrtftest WALLS.
+#define OCCL_GAIN   0.7f
+#define OCCL_GAINHF 0.15f
+#define OCCL_STEP   0.25f
+
+static dboolean oal_efx;
+static ALuint oal_filters[MAX_CHANNELS];
+static float oal_occl[MAX_CHANNELS];
+static LPALGENFILTERS p_alGenFilters;
+static LPALDELETEFILTERS p_alDeleteFilters;
+static LPALFILTERI p_alFilteri;
+static LPALFILTERF p_alFilterf;
 
 static void I_OAL_CloseDevice(void)
 {
@@ -90,6 +120,51 @@ static void I_OAL_LogHRTFStatus(void)
             alcGetString(oal_device, ALC_HRTF_SPECIFIER_SOFT));
   else
     lprintf(LO_WARN, "I_OAL_Init: HRTF %s; sound effects use plain stereo panning\n", name);
+}
+
+static void I_OAL_InitEFX(void)
+{
+  int i;
+
+  oal_efx = false;
+
+  if (!alcIsExtensionPresent(oal_device, "ALC_EXT_EFX"))
+  {
+    lprintf(LO_WARN, "I_OAL_Init: ALC_EXT_EFX not supported, occlusion unavailable\n");
+    return;
+  }
+
+  p_alGenFilters = (LPALGENFILTERS) alGetProcAddress("alGenFilters");
+  p_alDeleteFilters = (LPALDELETEFILTERS) alGetProcAddress("alDeleteFilters");
+  p_alFilteri = (LPALFILTERI) alGetProcAddress("alFilteri");
+  p_alFilterf = (LPALFILTERF) alGetProcAddress("alFilterf");
+
+  if (!p_alGenFilters || !p_alDeleteFilters || !p_alFilteri || !p_alFilterf)
+  {
+    lprintf(LO_WARN, "I_OAL_Init: EFX filter functions missing, occlusion unavailable\n");
+    return;
+  }
+
+  alGetError();
+  p_alGenFilters(MAX_CHANNELS, oal_filters);
+  if (alGetError() != AL_NO_ERROR)
+  {
+    lprintf(LO_WARN, "I_OAL_Init: couldn't create EFX filters, occlusion unavailable\n");
+    return;
+  }
+
+  for (i = 0; i < MAX_CHANNELS; i++)
+    p_alFilteri(oal_filters[i], AL_FILTER_TYPE, AL_FILTER_LOWPASS);
+
+  if (alGetError() != AL_NO_ERROR)
+  {
+    lprintf(LO_WARN, "I_OAL_Init: low-pass filter unsupported, occlusion unavailable\n");
+    p_alDeleteFilters(MAX_CHANNELS, oal_filters);
+    return;
+  }
+
+  memset(oal_occl, 0, sizeof(oal_occl));
+  oal_efx = true;
 }
 
 dboolean I_OAL_Init(void)
@@ -144,6 +219,7 @@ dboolean I_OAL_Init(void)
   lprintf(LO_INFO, "I_OAL_Init: OpenAL device \"%s\"\n",
           alcGetString(oal_device, ALC_DEVICE_SPECIFIER));
   I_OAL_LogHRTFStatus();
+  I_OAL_InitEFX();
 
   oal_active = true;
   return true;
@@ -160,7 +236,16 @@ void I_OAL_Shutdown(void)
   {
     alSourceStop(oal_sources[i]);
     alSourcei(oal_sources[i], AL_BUFFER, 0);
+    if (oal_efx)
+      alSourcei(oal_sources[i], AL_DIRECT_FILTER, AL_FILTER_NULL);
   }
+
+  if (oal_efx)
+  {
+    p_alDeleteFilters(MAX_CHANNELS, oal_filters);
+    oal_efx = false;
+  }
+
   alDeleteSources(MAX_CHANNELS, oal_sources);
 
   for (i = 0; i < oal_buffer_count; i++)
@@ -216,6 +301,25 @@ static ALuint I_OAL_GetBuffer(const i_oal_sample_t *sample)
   return *slot;
 }
 
+// snap: jump straight to the target (new sound), else fade one step (per tic)
+static void I_OAL_ApplyOcclusion(int channel, dboolean occluded, dboolean snap)
+{
+  ALuint filter = oal_filters[channel];
+  float target = occluded ? 1.0f : 0.0f;
+  float c;
+
+  if (!oal_efx)
+    return;
+
+  c = oal_occl[channel] =
+    snap ? target : dsda_OcclusionStep(oal_occl[channel], target, OCCL_STEP);
+
+  p_alFilterf(filter, AL_LOWPASS_GAIN, 1.0f + (OCCL_GAIN - 1.0f) * c);
+  p_alFilterf(filter, AL_LOWPASS_GAINHF, 1.0f + (OCCL_GAINHF - 1.0f) * c);
+  // filter parameters are copied on attach, so re-attach after every change
+  alSourcei(oal_sources[channel], AL_DIRECT_FILTER, filter);
+}
+
 static void I_OAL_ApplyParams(int channel, const sfx_params_t *params, float pitch)
 {
   ALuint source = oal_sources[channel];
@@ -252,6 +356,7 @@ int I_OAL_StartSound(int channel, const i_oal_sample_t *sample,
   alSourceStop(oal_sources[channel]);
   alSourcei(oal_sources[channel], AL_BUFFER, buffer);
   I_OAL_ApplyParams(channel, params, pitch);
+  I_OAL_ApplyOcclusion(channel, params->occluded, true);
   alSourcePlay(oal_sources[channel]);
 
   return channel;
@@ -263,6 +368,7 @@ void I_OAL_UpdateSoundParams(int channel, const sfx_params_t *params, float pitc
     return;
 
   I_OAL_ApplyParams(channel, params, pitch);
+  I_OAL_ApplyOcclusion(channel, params->occluded, false);
 }
 
 void I_OAL_StopSound(int channel)

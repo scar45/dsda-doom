@@ -64,6 +64,7 @@
 #include "dsda/settings.h"
 #include "dsda/sfx.h"
 #include "dsda/skip.h"
+#include "dsda/sound_occlusion.h"
 
 // Adjustable by menu.
 #define NORM_PITCH 128
@@ -350,6 +351,7 @@ void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume, dboolean impor
 
   params.ambient = false;
   params.spatial = false;
+  params.occluded = false;
   params.attenuation = adjust_attenuation;
   params.volume_factor = adjust_volume;
   params.loop = loop_timeout > 0;
@@ -556,7 +558,7 @@ void S_UnlinkSound(void *origin)
         const mobj_t *const mobj = (mobj_t *) origin;
         sobj->x = mobj->x;
         sobj->y = mobj->y;
-        sobj->z = mobj->z;
+        sobj->z = mobj->z + (mobj->height >> 1); // centre, like live mobjs
         channels[cnum].origin = (mobj_t *) sobj;
         break;
       }
@@ -824,10 +826,77 @@ void S_StopChannel(int cnum)
   }
 }
 
+// Sound origin classes for the HRTF backend. Origins are mobjs, the unlinked
+// copies in sobjs[], or the degenmobj_t soundorg inside a sector or line.
+typedef struct
+{
+  dboolean traced;                // false: unknown origin, no occlusion trace
+  fixed_t zlo, zhi;               // vertical span; dz uses the midpoint
+  const sector_t *ignore_sector;
+  const line_t *ignore_line;
+} sound_origin_info_t;
+
+static void S_ClassifyOrigin(const mobj_t *source, fixed_t listener_z,
+                             sound_origin_info_t *info)
+{
+  const char *p = (const char *) source;
+
+  info->traced = true;
+  info->ignore_sector = NULL;
+  info->ignore_line = NULL;
+
+  if (source->thinker.function == P_MobjThinker)
+  {
+    info->zlo = source->z;
+    info->zhi = source->z + source->height;
+    return;
+  }
+
+  if (p >= (const char *) sobjs && p < (const char *) (sobjs + MAX_CHANNELS))
+  {
+    info->zlo = info->zhi = source->z;
+    return;
+  }
+
+  if (sectors && p >= (const char *) sectors && p < (const char *) (sectors + numsectors))
+  {
+    const sector_t *sec = &sectors[(p - (const char *) sectors) / sizeof(sector_t)];
+
+    if ((const char *) &sec->soundorg == p)
+    {
+      info->zlo = sec->floorheight;
+      info->zhi = sec->ceilingheight;
+      info->ignore_sector = sec;
+      return;
+    }
+  }
+
+  if (lines && p >= (const char *) lines && p < (const char *) (lines + numlines))
+  {
+    const line_t *line = &lines[(p - (const char *) lines) / sizeof(line_t)];
+
+    if ((const char *) &line->soundorg == p && line->frontsector)
+    {
+      info->zlo = line->frontsector->floorheight;
+      info->zhi = line->frontsector->ceilingheight;
+      info->ignore_line = line;
+      return;
+    }
+  }
+
+  // Unknown origin, e.g. a buttonlist soundorg at (0,0) at complevel <
+  // prboom_6 or with comp_sound: keep it level and never trace it.
+  info->traced = false;
+  info->zlo = info->zhi = listener_z;
+}
+
 // Listener-relative position for the HRTF backend. Read-only on game state.
 static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *params)
 {
   fixed_t listener_z;
+  sound_origin_info_t origin;
+
+  params->occluded = false;
 
   if (raven)
   {
@@ -847,16 +916,19 @@ static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *p
   }
   else
   {
-    listener_z = listener->z;
+    listener_z = listener->z + listener->height - (listener->height >> 2);
     params->listener_pitch = 0;
   }
 
-  // Sector/line sound origins are degenmobj_t: only x/y are meaningful (z is
-  // never set) and they have no height field, so treat them as level.
-  if (source->thinker.function == P_MobjThinker)
-    params->dz = source->z + (source->height >> 1) - listener_z;
-  else
-    params->dz = 0;
+  S_ClassifyOrigin(source, listener_z, &origin);
+
+  params->dz = origin.zlo + ((origin.zhi - origin.zlo) >> 1) - listener_z;
+
+  if (origin.traced &&
+      dsda_IntConfig(dsda_config_snd_hrtf) && dsda_IntConfig(dsda_config_snd_occlusion))
+    params->occluded = dsda_SoundOccluded(listener->x, listener->y, listener_z,
+                                          source->x, source->y, origin.zlo, origin.zhi,
+                                          origin.ignore_sector, origin.ignore_line);
 }
 
 //
@@ -1234,6 +1306,7 @@ static void Raven_S_StartSoundAtVolume(void *_origin, int sound_id, int volume, 
   params.loop = loop_timeout > 0;
   params.loop_timeout = loop_timeout;
   params.spatial = false;
+  params.occluded = false;
 
   // calculate the distance before other stuff so that we can throw out
   // sounds that are beyond the hearing range.
@@ -1340,6 +1413,7 @@ void S_StartAmbientSound(void *_origin, int sound_id, int volume)
   params.loop = false;
   params.loop_timeout = 0;
   params.spatial = false;
+  params.occluded = false;
 
   // no priority checking, as ambient sounds would be the LOWEST.
   for (i = 0; i < numChannels; i++)

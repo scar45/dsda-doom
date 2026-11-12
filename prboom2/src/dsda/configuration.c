@@ -770,6 +770,10 @@ dsda_config_t dsda_config[dsda_config_count] = {
     "snd_hrtf", dsda_config_snd_hrtf,
     CONF_BOOL(0), NULL, NOT_STRICT, I_ChangeSfxBackend
   },
+  [dsda_config_snd_occlusion] = {
+    "snd_occlusion", dsda_config_snd_occlusion,
+    CONF_BOOL(1), NULL, NOT_STRICT
+  },
   [dsda_config_mus_fluidsynth_chorus] = {
     "mus_fluidsynth_chorus", dsda_config_mus_fluidsynth_chorus,
     CONF_BOOL(0)

@@ -159,6 +159,7 @@ typedef enum {
   dsda_config_snd_soundfont,
   dsda_config_snd_device,
   dsda_config_snd_hrtf,
+  dsda_config_snd_occlusion,
   dsda_config_mus_fluidsynth_chorus,
   dsda_config_mus_fluidsynth_reverb,
   dsda_config_mus_fluidsynth_gain,
