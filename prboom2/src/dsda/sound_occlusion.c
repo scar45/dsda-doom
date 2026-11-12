@@ -216,7 +216,8 @@ float dsda_SoundOcclusion(fixed_t ex, fixed_t ey, fixed_t ez,
       rays++;
     }
 
-  return (float) blocked / rays;
+  // squared: partial blockers (pillars) muffle lightly, walls (all rays) fully
+  return (float) (blocked * blocked) / (rays * rays);
 }
 
 float dsda_OcclusionStep(float current, float target, float step)
