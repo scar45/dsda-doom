@@ -50,22 +50,8 @@ static dboolean oal_active;
 
 // Occlusion: a low-pass per source, faded toward fully muffled (1) or clear
 // (0) by OCCL_STEP per tic. Tune by ear on hrtftest WALLS.
-#define OCCL_GAIN   0.7f
-#define OCCL_GAINHF 0.15f
-#define OCCL_STEP   0.25f
-
-static dboolean oal_efx;
-static ALuint oal_filters[MAX_CHANNELS];
-static float oal_occl[MAX_CHANNELS];
-static LPALGENFILTERS p_alGenFilters;
-static LPALDELETEFILTERS p_alDeleteFilters;
-static LPALFILTERI p_alFilteri;
-static LPALFILTERF p_alFilterf;
-
-// Occlusion: a low-pass per source, faded toward fully muffled (1) or clear
-// (0) by OCCL_STEP per tic. Tune by ear on hrtftest WALLS.
-#define OCCL_GAIN   0.7f
-#define OCCL_GAINHF 0.15f
+#define OCCL_GAIN   0.6f
+#define OCCL_GAINHF 0.07f
 #define OCCL_STEP   0.25f
 
 static dboolean oal_efx;
