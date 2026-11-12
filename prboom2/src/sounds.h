@@ -60,7 +60,7 @@ typedef struct {
   fixed_t dist;
   fixed_t dz;
   angle_t listener_pitch; // freelook pitch, positive = looking down
-  dboolean occluded;      // no line of sight to the source (snd_occlusion)
+  float occlusion;        // 0 clear .. 1 fully blocked (snd_occlusion)
 } sfx_params_t;
 
 //

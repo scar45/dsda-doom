@@ -19,6 +19,8 @@
 //  works in doubles (sound-side only, never feeds the simulation).
 //
 
+#include <math.h>
+
 #include "doomdata.h"
 #include "r_state.h"
 
@@ -175,6 +177,46 @@ dboolean dsda_SoundOccluded(fixed_t ex, fixed_t ey, fixed_t ez,
     return false;
 
   return !OCCL_CrossNode(&tr, numnodes - 1);
+}
+
+// Parallel rays at 0, +-OCCL_RAY_SPACING, +-2 * OCCL_RAY_SPACING map units.
+#define OCCL_RAY_PAIRS   2
+#define OCCL_RAY_SPACING 40.0
+
+float dsda_SoundOcclusion(fixed_t ex, fixed_t ey, fixed_t ez,
+                          fixed_t tx, fixed_t ty, fixed_t zlo, fixed_t zhi,
+                          const sector_t *ignore_sector, const line_t *ignore_line)
+{
+  double dx = FIX2D(tx) - FIX2D(ex), dy = FIX2D(ty) - FIX2D(ey);
+  double len = sqrt(dx * dx + dy * dy);
+  fixed_t tz = zlo + ((zhi - zlo) >> 1);
+  int blocked, rays, i, sign;
+
+  if (len < 1.0)
+    return 0.0f;
+
+  blocked = dsda_SoundOccluded(ex, ey, ez, tx, ty, zlo, zhi, ignore_sector, ignore_line);
+  rays = 1;
+
+  for (i = 1; i <= OCCL_RAY_PAIRS; i++)
+    for (sign = -1; sign <= 1; sign += 2)
+    {
+      double k = sign * i * OCCL_RAY_SPACING / len;
+      fixed_t ox = (fixed_t) (-dy * k * FRACUNIT);
+      fixed_t oy = (fixed_t) (dx * k * FRACUNIT);
+
+      // offset ends must be reachable from their centre points
+      if (dsda_SoundOccluded(ex, ey, ez, ex + ox, ey + oy, ez, ez, NULL, NULL) ||
+          dsda_SoundOccluded(tx, ty, tz, tx + ox, ty + oy, zlo, zhi,
+                             ignore_sector, ignore_line))
+        continue;
+
+      blocked += dsda_SoundOccluded(ex + ox, ey + oy, ez, tx + ox, ty + oy, zlo, zhi,
+                                    ignore_sector, ignore_line);
+      rays++;
+    }
+
+  return (float) blocked / rays;
 }
 
 float dsda_OcclusionStep(float current, float target, float step)

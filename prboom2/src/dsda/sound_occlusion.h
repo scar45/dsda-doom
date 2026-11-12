@@ -32,6 +32,15 @@ dboolean dsda_SoundOccluded(fixed_t ex, fixed_t ey, fixed_t ez,
                             fixed_t tx, fixed_t ty, fixed_t zlo, fixed_t zhi,
                             const sector_t *ignore_sector, const line_t *ignore_line);
 
+// Graded occlusion in [0, 1]: the share of 5 parallel sight lines (80 units apart at most)
+// (spread perpendicular to the eye->target line) that are blocked. Small
+// obstacles like pillars block some rays, walls between areas block all.
+// An offset ray only counts if its end points can be reached from the
+// centre points, so hugging a wall doesn't count the void behind it.
+float dsda_SoundOcclusion(fixed_t ex, fixed_t ey, fixed_t ez,
+                          fixed_t tx, fixed_t ty, fixed_t zlo, fixed_t zhi,
+                          const sector_t *ignore_sector, const line_t *ignore_line);
+
 // Ramp helper: move current toward target by at most step; result in [0, 1].
 float dsda_OcclusionStep(float current, float target, float step);
 

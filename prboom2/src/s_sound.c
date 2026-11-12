@@ -351,7 +351,7 @@ void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume, dboolean impor
 
   params.ambient = false;
   params.spatial = false;
-  params.occluded = false;
+  params.occlusion = 0.0f;
   params.attenuation = adjust_attenuation;
   params.volume_factor = adjust_volume;
   params.loop = loop_timeout > 0;
@@ -896,7 +896,7 @@ static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *p
   fixed_t listener_z;
   sound_origin_info_t origin;
 
-  params->occluded = false;
+  params->occlusion = 0.0f;
 
   if (raven)
   {
@@ -926,9 +926,9 @@ static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *p
 
   if (origin.traced &&
       dsda_IntConfig(dsda_config_snd_hrtf) && dsda_IntConfig(dsda_config_snd_occlusion))
-    params->occluded = dsda_SoundOccluded(listener->x, listener->y, listener_z,
-                                          source->x, source->y, origin.zlo, origin.zhi,
-                                          origin.ignore_sector, origin.ignore_line);
+    params->occlusion = dsda_SoundOcclusion(listener->x, listener->y, listener_z,
+                                            source->x, source->y, origin.zlo, origin.zhi,
+                                            origin.ignore_sector, origin.ignore_line);
 }
 
 //
@@ -1306,7 +1306,7 @@ static void Raven_S_StartSoundAtVolume(void *_origin, int sound_id, int volume, 
   params.loop = loop_timeout > 0;
   params.loop_timeout = loop_timeout;
   params.spatial = false;
-  params.occluded = false;
+  params.occlusion = 0.0f;
 
   // calculate the distance before other stuff so that we can throw out
   // sounds that are beyond the hearing range.
@@ -1413,7 +1413,7 @@ void S_StartAmbientSound(void *_origin, int sound_id, int volume)
   params.loop = false;
   params.loop_timeout = 0;
   params.spatial = false;
-  params.occluded = false;
+  params.occlusion = 0.0f;
 
   // no priority checking, as ambient sounds would be the LOWEST.
   for (i = 0; i < numChannels; i++)

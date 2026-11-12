@@ -291,10 +291,9 @@ static ALuint I_OAL_GetBuffer(const i_oal_sample_t *sample)
 }
 
 // snap: jump straight to the target (new sound), else fade one step (per tic)
-static void I_OAL_ApplyOcclusion(int channel, dboolean occluded, dboolean snap)
+static void I_OAL_ApplyOcclusion(int channel, float target, dboolean snap)
 {
   ALuint filter = oal_filters[channel];
-  float target = occluded ? 1.0f : 0.0f;
   float c;
 
   if (!oal_efx)
@@ -346,7 +345,7 @@ int I_OAL_StartSound(int channel, const i_oal_sample_t *sample,
   alSourceStop(oal_sources[channel]);
   alSourcei(oal_sources[channel], AL_BUFFER, buffer);
   I_OAL_ApplyParams(channel, params, pitch);
-  I_OAL_ApplyOcclusion(channel, params->occluded, true);
+  I_OAL_ApplyOcclusion(channel, params->occlusion, true);
   alSourcePlay(oal_sources[channel]);
 
   return channel;
@@ -358,7 +357,7 @@ void I_OAL_UpdateSoundParams(int channel, const sfx_params_t *params, float pitc
     return;
 
   I_OAL_ApplyParams(channel, params, pitch);
-  I_OAL_ApplyOcclusion(channel, params->occluded, false);
+  I_OAL_ApplyOcclusion(channel, params->occlusion, false);
 }
 
 void I_OAL_StopSound(int channel)
