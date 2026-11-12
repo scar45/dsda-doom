@@ -24,6 +24,7 @@
 
 #ifdef HAVE_LIBOPENAL
 
+#include <math.h>
 #include <string.h>
 
 #include "al.h"
@@ -49,10 +50,12 @@ static int oal_buffer_count;
 static dboolean oal_active;
 
 // Occlusion: a low-pass per source, faded toward fully muffled (1) or clear
-// (0) by OCCL_STEP per tic. Tune by ear on hrtftest WALLS.
+// (0) by OCCL_STEP per tic (8 tics, ~230 ms). The gains are interpolated in
+// dB so each tic changes the sound by the same audible amount. Tune by ear on
+// hrtftest WALLS.
 #define OCCL_GAIN   0.6f
 #define OCCL_GAINHF 0.07f
-#define OCCL_STEP   0.25f
+#define OCCL_STEP   0.125f
 
 static dboolean oal_efx;
 static ALuint oal_filters[MAX_CHANNELS];
@@ -300,8 +303,9 @@ static void I_OAL_ApplyOcclusion(int channel, dboolean occluded, dboolean snap)
   c = oal_occl[channel] =
     snap ? target : dsda_OcclusionStep(oal_occl[channel], target, OCCL_STEP);
 
-  p_alFilterf(filter, AL_LOWPASS_GAIN, 1.0f + (OCCL_GAIN - 1.0f) * c);
-  p_alFilterf(filter, AL_LOWPASS_GAINHF, 1.0f + (OCCL_GAINHF - 1.0f) * c);
+  // OCCL_GAIN^c: linear in dB from 1 (c = 0) to OCCL_GAIN (c = 1)
+  p_alFilterf(filter, AL_LOWPASS_GAIN, powf(OCCL_GAIN, c));
+  p_alFilterf(filter, AL_LOWPASS_GAINHF, powf(OCCL_GAINHF, c));
   // filter parameters are copied on attach, so re-attach after every change
   alSourcei(oal_sources[channel], AL_DIRECT_FILTER, filter);
 }
