@@ -33,6 +33,7 @@ typedef struct
 dboolean I_OAL_Init(void);
 void I_OAL_Shutdown(void);
 dboolean I_OAL_Active(void);
+dboolean I_OAL_OcclusionAvailable(void);
 int I_OAL_StartSound(int channel, const i_oal_sample_t *sample,
                      const sfx_params_t *params, float pitch);
 void I_OAL_UpdateSoundParams(int channel, const sfx_params_t *params, float pitch);

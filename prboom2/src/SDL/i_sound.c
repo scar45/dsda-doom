@@ -504,6 +504,11 @@ static void updateSoundParams(int handle, sfx_params_t *params)
   channelinfo[slot].rightvol = rightvol;
 }
 
+dboolean I_SfxOcclusionAvailable(void)
+{
+  return I_OAL_OcclusionAvailable();
+}
+
 void I_UpdateSoundParams(int handle, sfx_params_t *params)
 {
   if (I_OAL_Active())

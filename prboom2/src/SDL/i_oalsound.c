@@ -254,6 +254,11 @@ dboolean I_OAL_Active(void)
   return oal_active;
 }
 
+dboolean I_OAL_OcclusionAvailable(void)
+{
+  return oal_active && oal_efx;
+}
+
 static ALuint I_OAL_GetBuffer(const i_oal_sample_t *sample)
 {
   ALuint *slot;
@@ -299,8 +304,10 @@ static void I_OAL_ApplyOcclusion(int channel, float target, dboolean snap)
   if (!oal_efx)
     return;
 
-  c = oal_occl[channel] =
-    snap ? target : dsda_OcclusionStep(oal_occl[channel], target, OCCL_STEP);
+  c = snap ? target : dsda_OcclusionStep(oal_occl[channel], target, OCCL_STEP);
+  if (!snap && c == oal_occl[channel])
+    return; // unchanged: the attached filter already has these values
+  oal_occl[channel] = c;
 
   // OCCL_GAIN^c: linear in dB from 1 (c = 0) to OCCL_GAIN (c = 1)
   p_alFilterf(filter, AL_LOWPASS_GAIN, powf(OCCL_GAIN, c));
@@ -400,6 +407,7 @@ dboolean I_OAL_Init(void)
 
 void I_OAL_Shutdown(void) {}
 dboolean I_OAL_Active(void) { return false; }
+dboolean I_OAL_OcclusionAvailable(void) { return false; }
 int I_OAL_StartSound(int channel, const i_oal_sample_t *sample,
                      const sfx_params_t *params, float pitch) { return -1; }
 void I_OAL_UpdateSoundParams(int channel, const sfx_params_t *params, float pitch) {}

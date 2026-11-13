@@ -189,7 +189,7 @@ float dsda_SoundOcclusion(fixed_t ex, fixed_t ey, fixed_t ez,
 {
   double dx = FIX2D(tx) - FIX2D(ex), dy = FIX2D(ty) - FIX2D(ey);
   double len = sqrt(dx * dx + dy * dy);
-  fixed_t tz = zlo + ((zhi - zlo) >> 1);
+  fixed_t tz = (zlo >> 1) + (zhi >> 1); // halves first: zhi - zlo can overflow
   int blocked, rays, i, sign;
 
   if (len < 1.0)

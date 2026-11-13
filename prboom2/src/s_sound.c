@@ -867,6 +867,11 @@ static void S_ClassifyOrigin(const mobj_t *source, fixed_t listener_z,
       info->zlo = sec->floorheight;
       info->zhi = sec->ceilingheight;
       info->ignore_sector = sec;
+      // soundorg is the bbox centre: for split or L-shaped sectors it can lie
+      // outside the sector, behind walls, so tracing to it would always
+      // muffle. Keep the height, skip the trace.
+      if (R_PointInSector(sec->soundorg.x, sec->soundorg.y) != sec)
+        info->traced = false;
       return;
     }
   }
@@ -922,10 +927,10 @@ static void S_SetSpatialParams(mobj_t *listener, mobj_t *source, sfx_params_t *p
 
   S_ClassifyOrigin(source, listener_z, &origin);
 
-  params->dz = origin.zlo + ((origin.zhi - origin.zlo) >> 1) - listener_z;
+  // halves first: zhi - zlo can overflow for extreme sector heights
+  params->dz = (origin.zlo >> 1) + (origin.zhi >> 1) - listener_z;
 
-  if (origin.traced &&
-      dsda_IntConfig(dsda_config_snd_hrtf) && dsda_IntConfig(dsda_config_snd_occlusion))
+  if (origin.traced && dsda_IntConfig(dsda_config_snd_occlusion) && I_SfxOcclusionAvailable())
     params->occlusion = dsda_SoundOcclusion(listener->x, listener->y, listener_z,
                                             source->x, source->y, origin.zlo, origin.zhi,
                                             origin.ignore_sector, origin.ignore_line);

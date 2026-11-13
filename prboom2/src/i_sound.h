@@ -82,6 +82,9 @@ dboolean I_AnySoundStillPlaying(void);
 //  and pitch of a sound channel.
 void I_UpdateSoundParams(int handle, sfx_params_t *params);
 
+// True when the sfx backend can muffle occluded sounds (OpenAL + EFX).
+dboolean I_SfxOcclusionAvailable(void);
+
 // NSM sound capture routines
 // silences sound output, and instead allows sound capture to work
 // call this before sound startup
